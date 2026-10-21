@@ -10,8 +10,12 @@ Covers:
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+import os
+import sys
 import unittest
 from pymongo.asynchronous.database import AsyncDatabase
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 def to_utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt

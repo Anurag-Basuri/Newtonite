@@ -9,8 +9,12 @@ Covers:
 """
 
 import asyncio
+import os
+import sys
 import unittest
 from httpx import AsyncClient, ASGITransport
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.core.config import get_settings
 from app.db.client import mongo_manager

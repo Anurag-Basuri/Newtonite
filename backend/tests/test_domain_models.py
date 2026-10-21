@@ -3,8 +3,12 @@ Comprehensive unit tests for Opsboard domain models, validations, and enums.
 Uses python's standard unittest library (runnable via python -m unittest or pytest).
 """
 
+import os
+import sys
 import unittest
 from datetime import datetime, timedelta, timezone
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.domain.enums import (
     ItemStatus,

@@ -12,7 +12,11 @@ including:
   - P0 priority lead-only restriction
 """
 
+import os
+import sys
 import unittest
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.domain.enums import TeamRole, ItemPriority, ItemStatus
 from app.domain.policy import (
