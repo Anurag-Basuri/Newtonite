@@ -108,7 +108,7 @@ class FastembedProvider(EmbeddingProvider):
         self._model = None
         self._fallback = FakeEmbeddingProvider(dimensions=384, model_id=model_id)
         try:
-            from fastembed import TextEmbedding
+            from fastembed import TextEmbedding  # type: ignore
             self._model = TextEmbedding(model_name=model_id)
         except Exception as e:
             logger.info("Fastembed not available or model load deferred (%s). Using deterministic fake.", e)
