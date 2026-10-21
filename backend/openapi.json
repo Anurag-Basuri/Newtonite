@@ -109,7 +109,7 @@
           "teams"
         ],
         "summary": "List My Teams",
-        "description": "List teams caller belongs to, with their roles.",
+        "description": "List teams caller belongs to, with their roles. Org admins see all registered teams.",
         "operationId": "list_my_teams_api_v1_teams_get",
         "responses": {
           "200": {
@@ -1620,6 +1620,57 @@
           }
         }
       }
+    },
+    "/api/v1/users": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Search Users",
+        "description": "Search users (to add members). Requires org admin.",
+        "operationId": "search_users_api_v1_users_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Search term for name or email",
+              "default": "",
+              "title": "Q"
+            },
+            "description": "Search term for name or email"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Search Users Api V1 Users Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2000,7 +2051,24 @@
       "TransitionRequest": {
         "properties": {
           "to_status": {
-            "$ref": "#/components/schemas/ItemStatus"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "reason": {
             "anyOf": [
@@ -2037,9 +2105,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "to_status"
-        ],
         "title": "TransitionRequest"
       },
       "UpdateItemRequest": {
