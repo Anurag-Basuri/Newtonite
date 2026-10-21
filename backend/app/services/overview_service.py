@@ -74,11 +74,62 @@ class OverviewService:
             items = await cursor.to_list(length=sample_limit)
             return {"count": count, "items": items}
 
+        b_approval = await _fetch_bucket(approval_query)
+        b_overdue = await _fetch_bucket(overdue_query)
+        b_unowned = await _fetch_bucket(unowned_query)
+        b_stale = await _fetch_bucket(stale_query)
+        b_blocked = await _fetch_bucket(blocked_query)
+
+        unread_notifications = await self.db.notifications.count_documents(
+            {"user_id": user_id, "read": False}
+        )
+
+        buckets_list = [
+            {
+                "key": "awaiting_my_approval",
+                "label": "Awaiting your approval",
+                "count": min(b_approval["count"], 1000),
+                "capped": b_approval["count"] > 1000,
+                "items": b_approval["items"],
+            },
+            {
+                "key": "overdue_mine",
+                "label": "Overdue items assigned to you",
+                "count": min(b_overdue["count"], 1000),
+                "capped": b_overdue["count"] > 1000,
+                "items": b_overdue["items"],
+            },
+            {
+                "key": "unowned_urgent",
+                "label": "Unowned urgent items",
+                "count": min(b_unowned["count"], 1000),
+                "capped": b_unowned["count"] > 1000,
+                "items": b_unowned["items"],
+            },
+            {
+                "key": "stale",
+                "label": "Stale items needing triage",
+                "count": min(b_stale["count"], 1000),
+                "capped": b_stale["count"] > 1000,
+                "items": b_stale["items"],
+            },
+            {
+                "key": "blocked_mine",
+                "label": "Blocked items assigned to you",
+                "count": min(b_blocked["count"], 1000),
+                "capped": b_blocked["count"] > 1000,
+                "items": b_blocked["items"],
+            },
+        ]
+
         return {
-            "awaiting_my_approval": await _fetch_bucket(approval_query),
-            "overdue_mine": await _fetch_bucket(overdue_query),
-            "unowned_urgent": await _fetch_bucket(unowned_query),
-            "stale": await _fetch_bucket(stale_query),
-            "blocked_mine": await _fetch_bucket(blocked_query),
+            "generated_at": now.isoformat(),
             "computed_at": now.isoformat(),
+            "unread_notifications": unread_notifications,
+            "buckets": buckets_list,
+            "awaiting_my_approval": b_approval,
+            "overdue_mine": b_overdue,
+            "unowned_urgent": b_unowned,
+            "stale": b_stale,
+            "blocked_mine": b_blocked,
         }

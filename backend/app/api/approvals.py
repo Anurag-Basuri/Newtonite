@@ -4,9 +4,9 @@ Enforces four-eyes rule and atomic approval decisions.
 Matches docs/API_SPEC.md §3.4.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pymongo.asynchronous.database import AsyncDatabase
 
 from app.api.deps import (
@@ -27,8 +27,26 @@ class RequestApprovalBody(BaseModel):
 
 
 class DecideApprovalBody(BaseModel):
-    approved: bool
-    decision_reason: str = Field(min_length=1, max_length=1000)
+    approved: Optional[bool] = None
+    decision: Optional[str] = None
+    decision_reason: Optional[str] = Field(default=None, max_length=1000)
+    reason: Optional[str] = Field(default=None, max_length=1000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "decision" in data and "approved" not in data:
+                data["approved"] = str(data["decision"]).strip().lower() == "approve"
+            elif "approved" in data and "decision" not in data:
+                data["decision"] = "approve" if data["approved"] else "reject"
+            if "reason" in data and "decision_reason" not in data:
+                data["decision_reason"] = data["reason"]
+            elif "decision_reason" in data and "reason" not in data:
+                data["reason"] = data["decision_reason"]
+            if not data.get("decision_reason"):
+                data["decision_reason"] = "Approved by lead" if data.get("approved") else "Rejected by lead"
+        return data
 
 
 @router.post("/items/{identifier}/approval")
