@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pymongo.errors import DuplicateKeyError
 
-from app.api import ai, approvals, auth, features, items, notifications, overview, search, stream, teams
+from app.api import ai, approvals, auth, features, items, notifications, overview, search, stream, teams, users
 from app.core.config import get_settings
 from app.core.errors import DomainError, ProblemDetails
 from app.db.client import mongo_manager
@@ -162,3 +162,4 @@ app.include_router(ai.router, prefix=api_v1_prefix)
 app.include_router(search.router, prefix=api_v1_prefix)
 app.include_router(features.router, prefix=api_v1_prefix)
 app.include_router(stream.router, prefix=api_v1_prefix)
+app.include_router(users.router, prefix=api_v1_prefix)

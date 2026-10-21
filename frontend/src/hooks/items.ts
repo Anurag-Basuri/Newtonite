@@ -125,6 +125,15 @@ export const useTeamMembers = (teamId?: string) =>
     enabled: Boolean(teamId),
   });
 
+export const useSearchUsers = (q: string = "") =>
+  useQuery({
+    queryKey: ["users", q] as const,
+    queryFn: () =>
+      api<Array<{ id: string; name: string; email: string; is_active: boolean; is_org_admin: boolean }>>(
+        `/users?q=${encodeURIComponent(q)}`
+      ),
+  });
+
 export const useFeatures = () =>
   useQuery({
     queryKey: qk.features,
@@ -319,3 +328,55 @@ export const useMarkAllNotificationsRead = () => {
     onSettled: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 };
+
+export const useCreateTeam = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { name: string; slug: string; key_prefix: string }) =>
+      api<{ _id?: string; id?: string; name: string; slug: string; key_prefix: string }>("/teams", {
+        method: "POST",
+        body: payload,
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.teams });
+      qc.invalidateQueries({ queryKey: qk.me });
+    },
+  });
+};
+
+export const useAddTeamMember = (teamId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { user_id: string; role: "viewer" | "member" | "lead" }) =>
+      api(`/teams/${teamId}/members`, { method: "POST", body: payload }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.teamMembers(teamId) });
+      qc.invalidateQueries({ queryKey: qk.teams });
+    },
+  });
+};
+
+export const useUpdateTeamMemberRole = (teamId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: "viewer" | "member" | "lead" }) =>
+      api(`/teams/${teamId}/members/${userId}`, { method: "PATCH", body: { role } }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.teamMembers(teamId) });
+      qc.invalidateQueries({ queryKey: qk.teams });
+    },
+  });
+};
+
+export const useRemoveTeamMember = (teamId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      api(`/teams/${teamId}/members/${userId}`, { method: "DELETE" }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.teamMembers(teamId) });
+      qc.invalidateQueries({ queryKey: qk.teams });
+    },
+  });
+};
+

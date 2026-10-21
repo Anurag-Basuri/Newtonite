@@ -35,9 +35,28 @@ class UpdateMemberRoleRequest(BaseModel):
 @router.get("", response_model=List[Dict[str, Any]])
 async def list_my_teams(
     auth_data: tuple = Depends(get_current_user_and_memberships),
+    db: AsyncDatabase = Depends(get_database),
 ):
-    """List teams caller belongs to, with their roles."""
+    """List teams caller belongs to, with their roles. Org admins see all registered teams."""
     user, memberships = auth_data
+    if user.get("is_org_admin", False):
+        repo = TeamRepository(db)
+        all_teams = await repo.list_all_teams()
+        mem_by_team = {m.get("team_id"): m for m in memberships}
+        result = []
+        for t in all_teams:
+            tid = t.get("_id")
+            if tid in mem_by_team:
+                result.append(mem_by_team[tid])
+            else:
+                result.append({
+                    "team_id": tid,
+                    "team_name": t.get("name"),
+                    "slug": t.get("slug"),
+                    "key_prefix": t.get("key_prefix"),
+                    "role": TeamRole.LEAD.value,
+                })
+        return result
     return memberships
 
 

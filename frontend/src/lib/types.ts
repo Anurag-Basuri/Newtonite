@@ -68,6 +68,7 @@ export type Page<T> = { items: T[]; next_cursor: string | null; has_more: boolea
 export type TeamMembership = {
   team_id: string;
   team_name?: string;
+  slug?: string;
   role: "viewer" | "member" | "lead";
   key_prefix?: string;
   team?: { id: string; name: string; key_prefix?: string };
@@ -149,7 +150,14 @@ export type Features = {
 
 export type TeamMember = {
   id: string;
-  name: string;
-  email?: string;
+  user_id?: string;
+  team_id?: string;
   role: "viewer" | "member" | "lead";
+  name?: string;
+  email?: string;
+  user?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
 };

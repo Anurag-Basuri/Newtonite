@@ -11,6 +11,7 @@ import {
   Shield,
   Sparkles,
   Command,
+  Users,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useMe } from "@/hooks/items";
@@ -23,6 +24,7 @@ import { NotificationsMenu } from "./notifications-menu";
 const NAV = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/items", label: "All work", icon: Layers },
+  { href: "/teams", label: "Teams", icon: Users },
   { href: "/ask", label: "Ask History", icon: Sparkles },
 ];
 
@@ -39,12 +41,27 @@ export function Shell({ children }: { children: React.ReactNode }) {
     if (me.isError) router.replace("/login");
   }, [me.isError, router]);
 
-  // Global Ctrl+K / Cmd+K shortcut
+  // Global shortcuts: Cmd+K / Ctrl+K, "/" to search, "c" to create
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      const activeTag = (document.activeElement?.tagName || "").toLowerCase();
+      const isInput =
+        activeTag === "input" ||
+        activeTag === "textarea" ||
+        activeTag === "select" ||
+        document.activeElement?.getAttribute("contenteditable") === "true";
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((prev) => !prev);
+      } else if (!isInput && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (e.key === "/") {
+          e.preventDefault();
+          setPaletteOpen(true);
+        } else if (e.key.toLowerCase() === "c") {
+          e.preventDefault();
+          setCreateOpen(true);
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -214,7 +231,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Thumb Navigation */}
       <nav
         aria-label="Mobile Navigation"
-        className="safe-b fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 border-t border-line bg-surface/90 backdrop-blur-md md:hidden"
+        className="safe-b fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-line bg-surface/90 backdrop-blur-md md:hidden"
       >
         {NAV.map((n) => {
           const Icon = n.icon;

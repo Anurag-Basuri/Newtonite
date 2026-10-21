@@ -38,6 +38,34 @@ class UserRepository:
     async def get_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         return await self.db.users.find_one({"email": email.strip().lower()})
 
+    async def search_users(self, query: str = "", limit: int = 50) -> list[Dict[str, Any]]:
+        """Search users by name or email."""
+        import re
+        filter_dict: Dict[str, Any] = {}
+        if query and query.strip():
+            escaped = re.escape(query.strip())
+            filter_dict = {
+                "$or": [
+                    {"name": {"$regex": escaped, "$options": "i"}},
+                    {"email": {"$regex": escaped, "$options": "i"}},
+                ]
+            }
+        cursor = self.db.users.find(
+            filter_dict,
+            projection={"_id": 1, "name": 1, "email": 1, "is_active": 1, "is_org_admin": 1},
+        ).sort("name", 1)
+        users = await cursor.to_list(length=limit)
+        return [
+            {
+                "id": u["_id"],
+                "name": u.get("name"),
+                "email": u.get("email"),
+                "is_active": u.get("is_active", True),
+                "is_org_admin": u.get("is_org_admin", False),
+            }
+            for u in users
+        ]
+
     async def create_user(
         self,
         name: str,
