@@ -70,6 +70,11 @@ async def seed():
 
         # Compliance Team
         {"_id": generate_id("mem"), "team_id": cmp_team["_id"], "user_id": lead_user["_id"], "role": TeamRole.LEAD.value, "created_at": now},
+
+        # Admin Memberships (Lead access across demo teams)
+        {"_id": generate_id("mem"), "team_id": pay_team["_id"], "user_id": admin_user["_id"], "role": TeamRole.LEAD.value, "created_at": now},
+        {"_id": generate_id("mem"), "team_id": eng_team["_id"], "user_id": admin_user["_id"], "role": TeamRole.LEAD.value, "created_at": now},
+        {"_id": generate_id("mem"), "team_id": cmp_team["_id"], "user_id": admin_user["_id"], "role": TeamRole.LEAD.value, "created_at": now},
     ]
     await db.memberships.insert_many(memberships)
 
@@ -213,6 +218,13 @@ async def seed():
         {"_id": generate_id("evt"), "item_id": item3_id, "team_id": eng_team["_id"], "seq": 3, "type": "item.transitioned", "actor_id": member1["_id"], "actor_name": "Marcus Member", "data": {"from_status": "in_progress", "to_status": "blocked", "reason": item3["blocked_reason"]}, "created_at": now - timedelta(hours=30)},
     ]
     await db.item_events.insert_many(events)
+
+    # 6. Index sample items for RAG vector retrieval
+    logger.info("Indexing sample work items for vector search & AI RAG...")
+    from app.services.ai_service import AIService
+    ai_service = AIService(db)
+    for itm_id in [item1_id, item2_id, item3_id, item4_id]:
+        await ai_service.index_item(itm_id)
 
     logger.info("Successfully seeded database with demo users, teams, and sample items!")
     logger.info("Demo Accounts Created:")

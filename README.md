@@ -391,7 +391,7 @@ All 9 critical production queries execute via indexed B-Tree scans (`IXSCAN`) wi
 9. RAG chunk vector pre-filter scan: `IXSCAN`
 
 ### Retrieval Evaluation Benchmark (`make eval`)
-Evaluated against [`eval/golden_set.json`](eval/golden_set.json):
+Evaluated against [`backend/eval/golden_set.json`](backend/eval/golden_set.json):
 - **Recall@1:** `100.00%`
 - **Recall@5:** `100.00%` (Target: >= 80%)
 - **MRR (Mean Reciprocal Rank):** `1.0000`

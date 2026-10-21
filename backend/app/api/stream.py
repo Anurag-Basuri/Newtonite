@@ -17,7 +17,7 @@ from app.api.deps import get_current_user_and_memberships
 from app.db.client import get_database
 from app.domain.models.base import utc_now
 from app.repositories.events import EventRepository
-from app.repositories.users import UserRepository
+from app.repositories.teams import TeamRepository
 
 logger = logging.getLogger("opsboard.stream")
 router = APIRouter(tags=["stream"])
@@ -43,7 +43,7 @@ async def stream_events(
         yield f"event: hello\ndata: {json.dumps(hello_data)}\n\n"
 
         event_repo = EventRepository(db)
-        user_repo = UserRepository(db)
+        team_repo = TeamRepository(db)
 
         # Track last seen event seq / id
         last_seen_id = None
@@ -69,7 +69,7 @@ async def stream_events(
 
             # Periodically re-read memberships every 60s (SYSTEM_DESIGN §7.6)
             if membership_refresh_timer >= 60.0:
-                current_memberships = await user_repo.get_memberships_for_user(user_id)
+                current_memberships = await team_repo.get_memberships_for_user(user_id)
                 membership_refresh_timer = 0.0
 
             allowed_teams = {str(m["team_id"]) for m in current_memberships}

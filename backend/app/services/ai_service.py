@@ -406,6 +406,10 @@ class AIService:
         else:
             search_teams = user_team_ids
 
+        if not search_teams and user.get("is_org_admin"):
+            all_teams = await self.team_repo.list_all_teams()
+            search_teams = [str(t["_id"]) for t in all_teams]
+
         if not search_teams:
             return AskQuestionResponse(
                 question=question,
@@ -527,7 +531,7 @@ class AIService:
                     logger.warning("Stripping hallucinated citation marker [%s] from LLM output", m)
                     return ""
 
-                answer = re.sub(r"\[(S\d+)\]", replace_marker, raw_answer).strip()
+                answer = re.sub(r"[\[\u3010](S\d+)[\]\u3011]", replace_marker, raw_answer).strip()
 
             except Exception as e:
                 logger.exception("LLM generation failed: %s. Degrading response.", e)
