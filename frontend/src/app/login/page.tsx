@@ -5,11 +5,22 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { Lock, Mail, Loader2, Sparkles, ArrowRight, ShieldCheck } from "lucide-react";
+import {
+  Lock,
+  Mail,
+  Loader2,
+  ArrowRight,
+  ShieldCheck,
+  AlertCircle,
+  AlertTriangle,
+  ServerOff,
+  RotateCw,
+} from "lucide-react";
 import { api } from "@/lib/api";
+import { explain, type ProcessedError } from "@/lib/errors";
 
 const schema = z.object({
-  email: z.string().email("Enter a valid email address"),
+  email: z.string().email("Enter a valid work email address"),
   password: z.string().min(1, "Enter your password"),
 });
 
@@ -19,6 +30,7 @@ export default function Login() {
   const router = useRouter();
   const qc = useQueryClient();
   const [demoRole, setDemoRole] = useState<string | null>(null);
+  const [processedError, setProcessedError] = useState<ProcessedError | null>(null);
 
   const {
     register,
@@ -35,20 +47,31 @@ export default function Login() {
   });
 
   const onSubmit = handleSubmit(async (v) => {
+    setProcessedError(null);
     try {
       await api("/auth/login", { method: "POST", body: v });
       await qc.invalidateQueries({ queryKey: ["me"] });
       router.replace("/overview");
-    } catch {
-      setError("root", { message: "Invalid email or password. Please verify credentials." });
+    } catch (err: unknown) {
+      const p = explain(err);
+      setProcessedError(p);
+
+      // Map field-specific errors if available
+      if (p.fieldErrors) {
+        if (p.fieldErrors.email) setError("email", { message: p.fieldErrors.email });
+        if (p.fieldErrors.password) setError("password", { message: p.fieldErrors.password });
+      }
     }
   });
 
   const fillDemo = (email: string, roleName: string) => {
+    setProcessedError(null);
     setValue("email", email);
     setValue("password", "Password123!");
     setDemoRole(roleName);
   };
+
+  const isServerOffline = processedError?.code === "SERVER_OFFLINE";
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-12">
@@ -112,16 +135,48 @@ export default function Login() {
             )}
           </div>
 
-          {errors.root && (
-            <div role="alert" className="rounded-xl border border-p0/30 bg-p0/10 p-3 text-xs text-p0 font-medium">
-              {errors.root.message}
+          {/* Processed Intelligent Error Box */}
+          {processedError && (
+            <div
+              role="alert"
+              className={`rounded-xl border p-3.5 text-xs transition-all animate-in fade-in-0 duration-200 ${
+                isServerOffline
+                  ? "border-p0/40 bg-p0/10 text-ink"
+                  : processedError.tone === "warn"
+                  ? "border-p1/40 bg-p1/10 text-ink"
+                  : "border-p0/40 bg-p0/10 text-ink"
+              }`}
+            >
+              <div className="flex items-start gap-2.5">
+                {isServerOffline ? (
+                  <ServerOff className="size-4 text-p0 shrink-0 mt-0.5" />
+                ) : processedError.tone === "warn" ? (
+                  <AlertTriangle className="size-4 text-p1 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="size-4 text-p0 shrink-0 mt-0.5" />
+                )}
+
+                <div className="flex-1 space-y-1">
+                  <p className="font-bold text-ink leading-tight">
+                    {processedError.title}
+                  </p>
+                  <p className="text-ink/90 leading-relaxed">
+                    {processedError.message}
+                  </p>
+                  {processedError.actionHint && (
+                    <p className="font-medium text-signal pt-0.5">
+                      Hint: {processedError.actionHint}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-2.5 text-sm font-semibold text-canvas hover:opacity-90 active:scale-[0.99] disabled:opacity-50 transition-all shadow-sm"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-2.5 text-sm font-semibold text-canvas hover:opacity-90 active:scale-[0.99] disabled:opacity-50 transition-all shadow-sm cursor-pointer"
           >
             {isSubmitting ? (
               <>
@@ -145,7 +200,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => fillDemo("lead@opsboard.dev", "Team Lead")}
-                className="rounded-lg border border-line bg-canvas/50 px-2.5 py-1.5 text-left hover:bg-canvas hover:border-signal/50 transition-colors"
+                className="rounded-lg border border-line bg-canvas/50 px-2.5 py-1.5 text-left hover:bg-canvas hover:border-signal/50 transition-colors cursor-pointer"
               >
                 <div className="font-semibold text-ink">Priya (Lead)</div>
                 <div className="text-[10px] text-muted">Approval authority</div>
@@ -154,7 +209,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => fillDemo("member@opsboard.dev", "Team Member")}
-                className="rounded-lg border border-line bg-canvas/50 px-2.5 py-1.5 text-left hover:bg-canvas hover:border-signal/50 transition-colors"
+                className="rounded-lg border border-line bg-canvas/50 px-2.5 py-1.5 text-left hover:bg-canvas hover:border-signal/50 transition-colors cursor-pointer"
               >
                 <div className="font-semibold text-ink">Marcus (Member)</div>
                 <div className="text-[10px] text-muted">Claim & triage</div>
@@ -163,7 +218,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => fillDemo("admin@opsboard.dev", "Org Admin")}
-                className="rounded-lg border border-line bg-canvas/50 px-2.5 py-1.5 text-left hover:bg-canvas hover:border-signal/50 transition-colors"
+                className="rounded-lg border border-line bg-canvas/50 px-2.5 py-1.5 text-left hover:bg-canvas hover:border-signal/50 transition-colors cursor-pointer"
               >
                 <div className="font-semibold text-ink">Alice (Admin)</div>
                 <div className="text-[10px] text-muted">Full org access</div>
@@ -172,7 +227,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => fillDemo("viewer@opsboard.dev", "Viewer")}
-                className="rounded-lg border border-line bg-canvas/50 px-2.5 py-1.5 text-left hover:bg-canvas hover:border-signal/50 transition-colors"
+                className="rounded-lg border border-line bg-canvas/50 px-2.5 py-1.5 text-left hover:bg-canvas hover:border-signal/50 transition-colors cursor-pointer"
               >
                 <div className="font-semibold text-ink">Victor (Viewer)</div>
                 <div className="text-[10px] text-muted">Read-only audit</div>
@@ -180,7 +235,7 @@ export default function Login() {
             </div>
             {demoRole && (
               <p className="mt-2 text-center text-[10px] text-signal font-medium">
-                Filled {demoRole} credentials. Click "Sign in" above.
+                Filled {demoRole} credentials. Click "Sign in to Opsboard" above.
               </p>
             )}
           </div>

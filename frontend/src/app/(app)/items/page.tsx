@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Sparkles,
   Layers,
+  AlertTriangle,
 } from "lucide-react";
 import { useItems, useTeams } from "@/hooks/items";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@/lib/constants";
 import { Empty, ItemRowView } from "@/components/item-row";
 import { ErrorState, ListSkeleton, btnSecondary } from "@/components/ui";
+import { explain } from "@/lib/errors";
 
 function List() {
   const sp = useSearchParams();
@@ -230,7 +232,20 @@ function List() {
       {q.isLoading ? (
         <ListSkeleton rows={6} />
       ) : q.isError ? (
-        <ErrorState text="Couldn’t load work items." onRetry={() => q.refetch()} />
+        (() => {
+          const p = explain(q.error);
+          return (
+            <div className="rounded-2xl bg-surface p-8 text-center ring-1 ring-line shadow-2xs space-y-3">
+              <AlertTriangle className="size-8 text-p1 mx-auto" />
+              <h3 className="text-sm font-bold text-ink">{p.title}</h3>
+              <p className="text-xs text-muted leading-relaxed max-w-md mx-auto">{p.message}</p>
+              {p.actionHint && <p className="text-xs font-medium text-signal">Tip: {p.actionHint}</p>}
+              <button onClick={() => q.refetch()} className={`${btnSecondary} mt-2`}>
+                Try again
+              </button>
+            </div>
+          );
+        })()
       ) : (
         <div className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line shadow-2xs">
           {rows.length === 0 ? (

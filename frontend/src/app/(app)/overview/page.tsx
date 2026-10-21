@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { useOverview } from "@/hooks/items";
 import { Empty, ItemRowView } from "@/components/item-row";
-import { ErrorState, ListSkeleton } from "@/components/ui";
+import { ErrorState, ListSkeleton, btnSecondary } from "@/components/ui";
+import { explain } from "@/lib/errors";
 
 export default function Overview() {
   const q = useOverview();
@@ -35,7 +36,18 @@ export default function Overview() {
   }
 
   if (q.isError || !q.data) {
-    return <ErrorState text="Couldn’t load operational overview." onRetry={() => q.refetch()} />;
+    const p = explain(q.error);
+    return (
+      <div className="rounded-2xl bg-surface p-8 text-center ring-1 ring-line max-w-md mx-auto shadow-sm space-y-3">
+        <AlertTriangle className="size-8 text-p1 mx-auto" />
+        <h3 className="text-sm font-bold text-ink">{p.title}</h3>
+        <p className="text-xs text-muted leading-relaxed">{p.message}</p>
+        {p.actionHint && <p className="text-xs font-medium text-signal">Tip: {p.actionHint}</p>}
+        <button onClick={() => q.refetch()} className={`${btnSecondary} mt-2`}>
+          Try again
+        </button>
+      </div>
+    );
   }
 
   const buckets = q.data.buckets || [];

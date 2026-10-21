@@ -121,16 +121,25 @@ export default function ItemPage({ params }: { params: Promise<{ key: string }> 
   }
 
   if (item.isError || !item.data) {
+    const p = explain(item.error);
     return (
-      <div className="rounded-2xl bg-surface p-12 text-center ring-1 ring-line max-w-lg mx-auto shadow-sm">
-        <AlertTriangle className="size-10 text-p1 mx-auto mb-3" />
-        <h2 className="text-lg font-bold text-ink">Item not found or unavailable</h2>
-        <p className="mt-1 text-sm text-muted">
-          This item does not exist or you do not have permission in this team.
+      <div className="rounded-2xl bg-surface p-10 text-center ring-1 ring-line max-w-lg mx-auto shadow-sm space-y-3">
+        <AlertTriangle className="size-10 text-p1 mx-auto" />
+        <h2 className="text-lg font-bold text-ink">{p.title}</h2>
+        <p className="text-xs text-muted leading-relaxed max-w-sm mx-auto">
+          {p.message}
         </p>
-        <Link href="/items" className="mt-4 inline-block text-sm font-semibold text-signal hover:underline">
-          ← Back to all work
-        </Link>
+        {p.actionHint && (
+          <p className="text-xs font-medium text-signal">Tip: {p.actionHint}</p>
+        )}
+        <div className="pt-3 flex items-center justify-center gap-3">
+          <button onClick={() => item.refetch()} className={btnSecondary}>
+            Try reloading
+          </button>
+          <Link href="/items" className={btnPrimary}>
+            Back to all work
+          </Link>
+        </div>
       </div>
     );
   }
@@ -681,22 +690,30 @@ const DetailRow = ({ label, children }: { label: string; children: React.ReactNo
 
 /** Conflict Panel for Version Concurrency (412) */
 function ConflictPanel({ err, onReload }: { err: ApiError; onReload: () => void }) {
+  const p = explain(err);
   const changes: TimelineEvent[] = err.problem.meta?.changes_since ?? [];
   return (
-    <div role="alert" className="rounded-xl border border-p1/50 bg-p1/10 p-4 text-xs text-ink space-y-2">
-      <div className="flex items-center gap-2 font-bold text-p1">
-        <AlertTriangle className="size-4" />
-        <span>Version conflict: {explain(err).text}</span>
+    <div role="alert" className="rounded-2xl border border-p1/50 bg-p1/10 p-4 text-xs text-ink space-y-2.5">
+      <div className="flex items-center gap-2 font-bold text-p1 text-sm">
+        <AlertTriangle className="size-4.5" />
+        <span>{p.title}</span>
       </div>
+      <p className="text-ink/90 leading-relaxed">{p.message}</p>
       {changes.length > 0 && (
-        <ul className="list-disc pl-4 space-y-1 text-muted">
-          {changes.map((c) => (
-            <li key={c.id}>
-              {c.actor.name}: {describeEvent(c)}
-            </li>
-          ))}
-        </ul>
+        <div className="pt-2 border-t border-p1/30 space-y-1">
+          <p className="font-semibold text-muted text-[11px] uppercase tracking-wider">
+            Changes saved by other team members:
+          </p>
+          <ul className="list-disc pl-4 space-y-1 text-muted">
+            {changes.map((c) => (
+              <li key={c.id}>
+                <span className="font-medium text-ink">{c.actor?.name || "User"}</span>: {describeEvent(c)}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
+      {p.actionHint && <p className="text-[11px] font-medium text-signal">Tip: {p.actionHint}</p>}
       <button onClick={onReload} className={`${btnSecondary} mt-2`}>
         Load latest changes
       </button>

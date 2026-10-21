@@ -47,6 +47,7 @@ export function CreateItemDialog({
     handleSubmit,
     watch,
     reset,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -118,7 +119,15 @@ export function CreateItemDialog({
       onClose();
       router.push(`/items/${created.key}`);
     } catch (err) {
-      toast(explain(err));
+      const p = explain(err);
+      if (p.fieldErrors) {
+        Object.entries(p.fieldErrors).forEach(([field, msg]) => {
+          if (["team_id", "title", "description", "type", "priority", "due_at", "tags"].includes(field)) {
+            setError(field as any, { message: msg });
+          }
+        });
+      }
+      toast(p);
     }
   };
 
