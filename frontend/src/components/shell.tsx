@@ -23,6 +23,7 @@ import { NotificationsMenu } from "./notifications-menu";
 const NAV = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/items", label: "All work", icon: Layers },
+  { href: "/ask", label: "Ask History", icon: Sparkles },
 ];
 
 /** Desktop: sticky side rail with search, actions, user badge. Phone: slim top bar + bottom tab bar. */

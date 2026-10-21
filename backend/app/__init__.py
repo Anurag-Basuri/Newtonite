@@ -1,0 +1,1 @@
+"""Opsboard backend application."""
