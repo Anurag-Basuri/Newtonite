@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/* Tokens: cool slate paper + ink + signal blue. Priority colors are purposeful and crisp. */
+@theme {
+  --color-canvas: #f0f3f6;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-ink: #111822;
+  --color-muted: #64748b;
+  --color-line: #e2e8f0;
+  --color-line-subtle: #f1f5f9;
+  --color-signal: #0b5cad;
+  --color-signal-hover: #08498a;
+  --color-p0: #dc2626;
+  --color-p1: #d97706;
+  --color-p2: #3b82f6;
+  --color-p3: #64748b;
+  --color-ok: #16a34a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #0b0f15;
+    --color-surface: #141b24;
+    --color-surface-elevated: #1a232f;
+    --color-ink: #f1f5f9;
+    --color-muted: #94a3b8;
+    --color-line: #222d3b;
+    --color-line-subtle: #19222d;
+    --color-signal: #60a5fa;
+    --color-signal-hover: #93c5fd;
+    --color-p0: #ef4444;
+    --color-p1: #f59e0b;
+    --color-p2: #60a5fa;
+    --color-p3: #94a3b8;
+    --color-ok: #22c55e;
+    color-scheme: dark;
+  }
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+}
+
+.safe-b {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Glassmorphism token utility */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@media (prefers-color-scheme: dark) {
+  .glass-panel {
+    background: rgba(20, 27, 36, 0.85);
+  }
+}
+
+/* Custom minimal scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
