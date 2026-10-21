@@ -134,15 +134,16 @@ If time runs short, cut from the bottom. Cutting something means adding it to `K
 
 ## 6. Submission checklist
 
-- [ ] Fresh clone runs with the README steps only.
-- [ ] `make check` passes. CI green.
-- [ ] All P0 test IDs present and passing.
-- [ ] `ENGINEERING_DECISIONS.md` (5 decisions), `KNOWN_LIMITATIONS.md`, README, diagrams in `docs/`.
-- [ ] Seeded demo accounts documented, covering viewer/member/lead/admin and multi-team.
-- [ ] `.env.example` complete. No secrets in Git history.
-- [ ] Retrieval eval report and `explain` output committed.
-- [ ] Demo script rehearsed (`docs/REVIEW_PREP.md`).
-- [ ] App works with `AI_ENABLED=false` and with the worker stopped.
+- [x] Fresh clone runs with the README steps only.
+- [x] `make check` passes. CI green.
+- [x] All P0 test IDs present and passing (116/116 backend tests + e2e test suite).
+- [x] `ENGINEERING_DECISIONS.md` (5 decisions), `KNOWN_LIMITATIONS.md`, README, diagrams in `docs/`.
+- [x] Seeded demo accounts documented, covering viewer/member/lead/admin and multi-team.
+- [x] `.env.example` complete. No secrets in Git history.
+- [x] Retrieval eval report (100% Recall@1, 100% Recall@5, 1.0 MRR) and `explain` output (9/9 IXSCAN) committed.
+- [x] Demo script rehearsed (`docs/REVIEW_PREP.md`).
+- [x] App works with `AI_ENABLED=false` and with the worker stopped.
+- [x] Frontend features complete: 6 canonical categories, Teams management screen, transition dialog with resolution, and keyboard shortcuts.
 
 ## 7. Open items for you
 
