@@ -1,6 +1,15 @@
 export type Priority = "P0" | "P1" | "P2" | "P3";
 export type Status = "open" | "triaged" | "in_progress" | "blocked" | "pending_approval" | "resolved" | "closed";
-export type ItemType = "customer_issue" | "payment" | "compliance" | "system_alert" | "access_request" | string;
+export type ItemType =
+  | "customer_issue"
+  | "engineering"
+  | "payment"
+  | "incident"
+  | "compliance"
+  | "task"
+  | "system_alert"
+  | "access_request"
+  | string;
 
 export type UserRef = { id: string; name: string; email?: string };
 

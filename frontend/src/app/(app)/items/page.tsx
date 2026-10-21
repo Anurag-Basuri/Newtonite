@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useItems, useTeams } from "@/hooks/items";
 import {
+  ITEM_TYPE_FILTERS,
+  ITEM_TYPE_META,
   PRIORITY_FILTERS,
   PRIORITY_META,
   SORT_OPTIONS,
@@ -212,6 +214,27 @@ function List() {
                 }`}
               >
                 {p}
+              </button>
+            );
+          })}
+
+          <span className="text-[11px] font-semibold text-muted uppercase tracking-wider ml-2 mr-1">
+            Category:
+          </span>
+          {ITEM_TYPE_FILTERS.map((t) => {
+            const isPressed = sp.has("type", t);
+            return (
+              <button
+                key={t}
+                onClick={() => toggle("type", t)}
+                aria-pressed={isPressed}
+                className={`min-h-8 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all ${
+                  isPressed
+                    ? "border-ink bg-ink text-canvas shadow-xs"
+                    : "border-line bg-canvas/40 text-muted hover:text-ink hover:bg-canvas"
+                }`}
+              >
+                {ITEM_TYPE_META[t]?.label || t}
               </button>
             );
           })}

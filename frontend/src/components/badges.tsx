@@ -25,11 +25,16 @@ export const PriorityMark = ({ p }: { p: Priority }) => {
 };
 
 export const TypeBadge = ({ type }: { type: string }) => {
-  const meta = ITEM_TYPE_META[type] ?? { label: type.replace(/_/g, " "), color: "text-muted" };
+  const meta = ITEM_TYPE_META[type] ?? {
+    label: type.replace(/_/g, " "),
+    color: "text-muted",
+    dot: "bg-muted/60",
+    tone: "text-muted border-line bg-surface/50",
+  };
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted font-normal">
-      <span className="size-1 rounded-full bg-muted/60" />
-      {meta.label}
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium ${meta.tone || "text-muted border-line bg-surface/50"}`}>
+      <span className={`size-1.5 rounded-full ${meta.dot || "bg-muted"}`} />
+      <span>{meta.label}</span>
     </span>
   );
 };

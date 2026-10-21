@@ -18,16 +18,61 @@ export const PRIORITY_META: Record<Priority, { label: string; shortLabel: string
   P3: { label: "P3 · Low", shortLabel: "Low", bar: "bg-p3", badge: "text-p3 border-p3/40 bg-p3/10", glow: "" },
 };
 
-export const ITEM_TYPE_META: Record<string, { label: string; color: string }> = {
-  customer_issue: { label: "Customer issue", color: "text-p2" },
-  payment: { label: "Payment exception", color: "text-p1" },
-  compliance: { label: "Compliance review", color: "text-signal" },
-  system_alert: { label: "System alert", color: "text-p0" },
-  access_request: { label: "Access request", color: "text-ink" },
+export const ITEM_TYPE_META: Record<string, { label: string; color: string; dot: string; tone: string }> = {
+  customer_issue: {
+    label: "Customer Issue",
+    color: "text-p2",
+    dot: "bg-p2",
+    tone: "text-p2 border-p2/30 bg-p2/10",
+  },
+  engineering: {
+    label: "Engineering Problem",
+    color: "text-signal",
+    dot: "bg-signal",
+    tone: "text-signal border-signal/30 bg-signal/10",
+  },
+  payment: {
+    label: "Payment Exception",
+    color: "text-p1",
+    dot: "bg-p1",
+    tone: "text-p1 border-p1/30 bg-p1/10",
+  },
+  incident: {
+    label: "Production Incident",
+    color: "text-p0",
+    dot: "bg-p0",
+    tone: "text-p0 border-p0/30 bg-p0/10",
+  },
+  compliance: {
+    label: "Compliance Request",
+    color: "text-ok",
+    dot: "bg-ok",
+    tone: "text-ok border-ok/30 bg-ok/10",
+  },
+  task: {
+    label: "Operational Task",
+    color: "text-muted",
+    dot: "bg-muted",
+    tone: "text-muted border-line bg-surface/80",
+  },
+  // Backwards compatibility aliases
+  system_alert: {
+    label: "Production Incident",
+    color: "text-p0",
+    dot: "bg-p0",
+    tone: "text-p0 border-p0/30 bg-p0/10",
+  },
+  access_request: {
+    label: "Access Request",
+    color: "text-ink",
+    dot: "bg-muted",
+    tone: "text-ink border-line bg-surface/80",
+  },
 };
 
 export const STATUS_FILTERS = ["open", "triaged", "in_progress", "blocked", "pending_approval", "resolved", "closed"] as const;
 export const PRIORITY_FILTERS = ["P0", "P1", "P2", "P3"] as const;
+export const ITEM_TYPE_FILTERS = ["customer_issue", "engineering", "payment", "incident", "compliance", "task"] as const;
 
 export const VIEW_PRESETS = [
   { key: "all", label: "All items" },
