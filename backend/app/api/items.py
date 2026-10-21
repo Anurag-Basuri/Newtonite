@@ -8,7 +8,7 @@ from datetime import datetime
 import json
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pymongo.asynchronous.database import AsyncDatabase
 
 from app.api.deps import (
@@ -47,10 +47,21 @@ class UpdateItemRequest(BaseModel):
 
 
 class TransitionRequest(BaseModel):
-    to_status: ItemStatus
+    to_status: Optional[ItemStatus] = None
+    to: Optional[ItemStatus] = None
     reason: Optional[str] = Field(default=None, max_length=1000)
     resolution: Optional[ItemResolution] = None
     duplicate_of: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_to(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            target = data.get("to") or data.get("to_status")
+            if target:
+                data["to_status"] = target
+                data["to"] = target
+        return data
 
 
 class CommentRequest(BaseModel):

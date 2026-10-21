@@ -97,6 +97,8 @@ export default function ItemPage({ params }: { params: Promise<{ key: string }> 
     to: "",
   });
   const [transitionReason, setTransitionReason] = useState("");
+  const [transitionResolution, setTransitionResolution] = useState<string>("completed");
+  const [transitionDuplicateOf, setTransitionDuplicateOf] = useState("");
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [approvalNote, setApprovalNote] = useState("");
   const [decisionModal, setDecisionModal] = useState<{ open: boolean; approved: boolean }>({
@@ -193,6 +195,12 @@ export default function ItemPage({ params }: { params: Promise<{ key: string }> 
               <StatusBadge status={it.status} />
               <PriorityMark p={it.priority} />
               <TypeBadge type={it.type} />
+              {it.resolution && (
+                <span className="inline-flex items-center gap-1 rounded-lg border border-line bg-canvas px-2.5 py-0.5 text-xs font-medium text-muted capitalize">
+                  Resolution: {it.resolution.replace("_", " ")}
+                  {it.duplicate_of && ` (${it.duplicate_of})`}
+                </span>
+              )}
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink leading-tight">
@@ -293,6 +301,8 @@ export default function ItemPage({ params }: { params: Promise<{ key: string }> 
                     if (to === "blocked" || to === "closed" || to === "resolved") {
                       setTransitionModal({ open: true, to });
                       setTransitionReason("");
+                      setTransitionResolution(to === "closed" ? "cancelled" : "completed");
+                      setTransitionDuplicateOf("");
                     } else {
                       move.mutate(
                         { to, version: it.version },
@@ -459,6 +469,15 @@ export default function ItemPage({ params }: { params: Promise<{ key: string }> 
                 </span>
               </DetailRow>
 
+              {it.resolution && (
+                <DetailRow label="Resolution">
+                  <span className="font-semibold text-ink capitalize">
+                    {it.resolution.replace("_", " ")}
+                    {it.duplicate_of && ` (${it.duplicate_of})`}
+                  </span>
+                </DetailRow>
+              )}
+
               {it.requires_approval && (
                 <DetailRow label="Policy">
                   <span className="inline-flex items-center gap-1 text-p1 font-medium">
@@ -537,18 +556,59 @@ export default function ItemPage({ params }: { params: Promise<{ key: string }> 
         description="Provide operational justification for auditing and team visibility."
       >
         <div className="space-y-4 pt-2">
+          {/* Resolution Selector for resolved and closed */}
+          {(transitionModal.to === "resolved" || transitionModal.to === "closed") && (
+            <div>
+              <label className="block text-xs font-semibold text-ink mb-1">
+                Resolution *
+              </label>
+              <select
+                value={transitionResolution}
+                onChange={(e) => setTransitionResolution(e.target.value)}
+                className="w-full rounded-xl border border-line bg-canvas p-2.5 text-sm text-ink focus:border-signal focus:outline-none"
+              >
+                <option value="completed">Completed (Work successfully executed)</option>
+                <option value="wont_do">Won&apos;t Do (Out of scope or working as expected)</option>
+                <option value="duplicate">Duplicate (Duplicated by another item)</option>
+                <option value="cancelled">Cancelled (Obsolete or superseded)</option>
+              </select>
+            </div>
+          )}
+
+          {/* Duplicate Of Input */}
+          {(transitionModal.to === "resolved" || transitionModal.to === "closed") &&
+            transitionResolution === "duplicate" && (
+              <div>
+                <label className="block text-xs font-semibold text-ink mb-1">
+                  Duplicate Of (Item Key) *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. PAY-101"
+                  value={transitionDuplicateOf}
+                  onChange={(e) => setTransitionDuplicateOf(e.target.value.toUpperCase())}
+                  className="w-full rounded-xl border border-line bg-canvas p-2.5 text-sm font-mono font-semibold uppercase text-ink placeholder:text-muted focus:border-signal focus:outline-none"
+                />
+              </div>
+            )}
+
           <div>
-            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1">
-              Reason / Note *
+            <label className="block text-xs font-semibold text-ink mb-1">
+              {transitionModal.to === "blocked" ? "Blocker Reason *" : "Reason / Operational Note"}
             </label>
             <textarea
               rows={3}
               value={transitionReason}
               onChange={(e) => setTransitionReason(e.target.value)}
-              placeholder="e.g. Awaiting bank partner transaction confirmation or user verified refund..."
-              className="w-full rounded-xl border border-line bg-surface p-3 text-sm text-ink focus:border-signal"
+              placeholder={
+                transitionModal.to === "blocked"
+                  ? "Describe what is blocking this item (e.g. waiting on external bank partner confirmation)..."
+                  : "e.g. User verified refund received, dispute closed..."
+              }
+              className="w-full rounded-xl border border-line bg-canvas p-3 text-sm text-ink placeholder:text-muted focus:border-signal focus:outline-none"
             />
           </div>
+
           <div className="flex justify-end gap-2 pt-2 border-t border-line">
             <button
               onClick={() => setTransitionModal({ open: false, to: "" })}
@@ -557,13 +617,26 @@ export default function ItemPage({ params }: { params: Promise<{ key: string }> 
               Cancel
             </button>
             <button
-              disabled={!transitionReason.trim() || move.isPending}
+              disabled={
+                move.isPending ||
+                (transitionModal.to === "blocked" && !transitionReason.trim()) ||
+                ((transitionModal.to === "resolved" || transitionModal.to === "closed") &&
+                  transitionResolution === "duplicate" &&
+                  !transitionDuplicateOf.trim())
+              }
               onClick={() => {
                 if (transitionModal.to) {
+                  const isClosingOrResolving =
+                    transitionModal.to === "resolved" || transitionModal.to === "closed";
                   move.mutate(
                     {
                       to: transitionModal.to,
-                      reason: transitionReason.trim(),
+                      reason: transitionReason.trim() || undefined,
+                      resolution: isClosingOrResolving ? transitionResolution : undefined,
+                      duplicate_of:
+                        isClosingOrResolving && transitionResolution === "duplicate"
+                          ? transitionDuplicateOf.trim()
+                          : undefined,
                       version: it.version,
                     },
                     {
@@ -578,7 +651,7 @@ export default function ItemPage({ params }: { params: Promise<{ key: string }> 
               }}
               className={btnPrimary}
             >
-              Confirm status change
+              {move.isPending ? "Transitioning..." : "Confirm status change"}
             </button>
           </div>
         </div>
