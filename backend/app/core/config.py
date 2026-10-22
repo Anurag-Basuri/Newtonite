@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     WORKER_POLL_INTERVAL_MS: int = 1000
     OUTBOX_MAX_ATTEMPTS: int = 6
     OUTBOX_LEASE_SECONDS: int = 30
+    RUN_WORKER: bool = False
 
     # AI & Search Configuration
     AI_ENABLED: bool = True

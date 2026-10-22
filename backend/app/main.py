@@ -4,6 +4,7 @@ Configures lifespan events, CORS, RFC 7807 Problem Details exception handlers,
 and registers all API v1 routes.
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 import logging
 import uuid
@@ -37,7 +38,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Opsboard backend ready.")
     except Exception as e:
         logger.warning("MongoDB initialization notice: %s. Continuing startup...", e)
+
+    worker = None
+    worker_task = None
+    if cfg.RUN_WORKER:
+        try:
+            from app.worker import OutboxWorker
+            worker = OutboxWorker()
+            worker_task = asyncio.create_task(worker.start())
+            logger.info("Embedded outbox worker started.")
+        except Exception as e:
+            logger.warning("Failed to start embedded outbox worker: %s", e)
+
     yield
+
+    if worker:
+        await worker.stop()
+    if worker_task:
+        worker_task.cancel()
+
     logger.info("Shutting down MongoDB connection pool...")
     await mongo_manager.close()
 
@@ -56,6 +75,7 @@ cfg = get_settings()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[cfg.APP_ORIGIN, "http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
