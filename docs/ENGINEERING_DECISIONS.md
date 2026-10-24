@@ -1,99 +1,54 @@
 # Engineering Decisions
 
-Each decision lists the context, the choice, the alternatives rejected, and the trade-off accepted. The system is a modular monolith (FastAPI API plus worker) on MongoDB Atlas with a Next.js frontend. See `docs/SYSTEM_DESIGN.md` for the full design.
+A concise breakdown of the 5 core architectural decisions for Opsboard.
 
 ---
 
-## 1. MongoDB, with correctness enforced by transactions, conditional updates and unique indexes
+### Quick Decision Matrix
 
-**Context.** Work items have a rich, evolving shape, and the history is large and append-only. The brief stresses concurrency and consistency. MongoDB was chosen for the project.
-
-**Decision.**
-- One **document per work item** holds current state. Unbounded things (history, approvals, notifications, vector chunks) live in **separate collections** keyed by `item_id`, so documents stay small and the 16 MB limit is never a concern.
-- Correctness comes from the database, not from application checks:
-  - **Compare-and-set** (`find_one_and_update` with a precondition in the filter) for claims and approval decisions.
-  - A **`version` counter** for optimistic locking.
-  - **Unique and partial-unique indexes** for invariants (one pending approval per item, unique idempotency key per user, unique notification dedupe key).
-  - **Multi-document transactions** only where several writes must commit together (state + event + outbox + idempotency record).
-- The **PyMongo Async API** is used, not Motor, which MongoDB has deprecated.
-
-**Alternatives rejected.** PostgreSQL has stronger relational guarantees and I would pick it for a pure ticketing system, but MongoDB was the requirement, and Atlas gives full-text and vector search in the same database. Beanie or another ODM was rejected because hiding the filter inside an ODM makes atomic-update semantics harder to see and explain.
-
-**Trade-off.** Transactions add latency and write-conflict retries, and they are only valid on replica sets. I keep them short and limited to the writes that must be atomic, and document that Atlas free clusters throttle to 100 ops/s, so load testing happens locally.
+| # | Decision | Core Mechanism | Key Trade-Off | Primary Implementation Files |
+|---|---|---|---|---|
+| **1** | **MongoDB + PyMongo Async API** | ACID transactions (`with_transaction`) + atomic CAS updates. No ODM or Motor. | Latency overhead for replica set transactions; kept brief. | [`db/uow.py`](file:///d:/projects/Newtonite/backend/app/db/uow.py)<br>[`db/client.py`](file:///d:/projects/Newtonite/backend/app/db/client.py)<br>[`db/indexes.py`](file:///d:/projects/Newtonite/backend/app/db/indexes.py) |
+| **2** | **Three-Layer Concurrency Defences** | 1. **Claims:** Atomic CAS (`assignee_id: null`) → 409 on race.<br>2. **Edits:** `If-Match: "<version>"` → 412 on stale write.<br>3. **Retries:** `Idempotency-Key` committed in same txn. | Users occasionally see conflict dialogs rather than silent data overwrites. | [`repositories/items.py`](file:///d:/projects/Newtonite/backend/app/repositories/items.py)<br>[`infra/idempotency.py`](file:///d:/projects/Newtonite/backend/app/infra/idempotency.py)<br>[`api/items.py`](file:///d:/projects/Newtonite/backend/app/api/items.py) |
+| **3** | **Transactional Outbox (No Message Broker)** | Mutations, audit events, and outbox jobs commit in **one transaction**. Worker polls with 30s atomic leases and exponential backoff. | Polling adds ~1s latency. Zero dual-write risk; no external Redis/RabbitMQ. | [`infra/outbox.py`](file:///d:/projects/Newtonite/backend/app/infra/outbox.py)<br>[`worker.py`](file:///d:/projects/Newtonite/backend/app/worker.py)<br>[`repositories/notifications.py`](file:///d:/projects/Newtonite/backend/app/repositories/notifications.py) |
+| **4** | **Pure Authorization Policy + 404 Obscurity** | `policy.can(actor, action, resource)` is a pure function (zero I/O). Enforces **Four-Eyes** (requester cannot self-approve). Foreign items return **404** (not 403). | Custom policy requires matrix testing (43 test cases in test suite). | [`domain/policy.py`](file:///d:/projects/Newtonite/backend/app/domain/policy.py)<br>[`domain/workflow.py`](file:///d:/projects/Newtonite/backend/app/domain/workflow.py)<br>[`services/approval_service.py`](file:///d:/projects/Newtonite/backend/app/services/approval_service.py) |
+| **5** | **Grounded RAG with Team Pre-Filtering** | Semantic chunking, MongoDB `$vectorSearch` pre-filtered by caller's `team_id`s, Groq LLM synthesis, server-side citation validation, circuit breaker. | Hand-rolled pipeline (≈200 lines) instead of LangChain; fully testable and isolated. | [`services/ai_service.py`](file:///d:/projects/Newtonite/backend/app/services/ai_service.py)<br>[`infra/ai/providers.py`](file:///d:/projects/Newtonite/backend/app/infra/ai/providers.py)<br>[`repositories/chunks.py`](file:///d:/projects/Newtonite/backend/app/repositories/chunks.py) |
 
 ---
 
-## 2. Three layered defences against concurrent and stale updates
+### Detailed Summary
 
-**Context.** Two people claiming the same work, editing an old version, and clicking twice are the situations the brief calls out.
+#### 1. Database & Atomicity (MongoDB via PyMongo Async)
+- **Why:** Work item shapes evolve; history is append-only. Native `AsyncMongoClient` provides direct control over query plans and transactions without Motor or ODM abstractions.
+- **Rules:** State in `work_items`; unbounded data (`item_events`, `approvals`, `outbox`) stored in separate collections to avoid MongoDB's 16 MB limit.
+- **Files:** [`uow.py`](file:///d:/projects/Newtonite/backend/app/db/uow.py) · [`client.py`](file:///d:/projects/Newtonite/backend/app/db/client.py) · [`indexes.py`](file:///d:/projects/Newtonite/backend/app/db/indexes.py)
 
-**Decision.**
-1. **Claim is atomic.** `find_one_and_update({assignee_id: null, ...})` makes the database pick exactly one winner. The loser gets `409 ALREADY_CLAIMED` naming the winner.
-2. **Edits are optimistic.** `ETag`/`If-Match` carry the item `version`. A stale write returns `412` with the current item *and the events since the caller's version*, so the UI can show what changed instead of a generic failure. Comments do not bump `version`, so chatting never blocks anyone's edit.
-3. **Retries are idempotent.** `Idempotency-Key` plus a unique `(user_id, key)` index. The key record is written **in the same transaction** as the business write, so there is no window where the action happened but the key was lost.
+#### 2. Concurrency & Stale Updates
+- **Why:** Prevent race conditions in high-concurrency environments.
+- **Rules:**
+  - **Claim Race:** Atomic `find_one_and_update({"_id": id, "assignee_id": None})`. Single winner; loser gets HTTP 409.
+  - **Stale Edits:** `If-Match: "<version>"` checks version on save; stale writes return HTTP 412 with timeline diff. Comments do not bump `version`.
+  - **Idempotency:** Unique `Idempotency-Key` stored inside the business transaction.
+- **Files:** [`repositories/items.py`](file:///d:/projects/Newtonite/backend/app/repositories/items.py) · [`infra/idempotency.py`](file:///d:/projects/Newtonite/backend/app/infra/idempotency.py) · [`api/items.py`](file:///d:/projects/Newtonite/backend/app/api/items.py)
 
-**Alternatives rejected.** Pessimistic locks or "edit lock" leases (blocks people, needs timeout handling, adds UI complexity). Last-write-wins (silent data loss). Field-level auto-merge on the server (surprising semantics for operational data, so the user decides in the UI).
+#### 3. Transactional Outbox Pattern
+- **Why:** Eliminates the dual-write hazard between database mutations and notifications/indexing.
+- **Rules:** State change, event, and outbox job commit in the **same transaction**. Background worker claims jobs with atomic 30s leases and dedupe keys.
+- **Files:** [`infra/outbox.py`](file:///d:/projects/Newtonite/backend/app/infra/outbox.py) · [`worker.py`](file:///d:/projects/Newtonite/backend/app/worker.py) · [`notifications.py`](file:///d:/projects/Newtonite/backend/app/repositories/notifications.py)
 
-**Trade-off.** Users occasionally see a conflict dialog. That is intentional: for incidents and payments a visible conflict is better than a silent overwrite. Only successful (2xx) responses are stored for replay, so a retry after a *failed* attempt re-evaluates against current state. That is simpler and avoids replaying stale errors, at the cost of non-idempotent error responses.
+#### 4. Authorization & Security (Four-Eyes + 404s)
+- **Why:** Centralized, auditable access control that prevents unauthorized resource enumeration.
+- **Rules:** Pure function `can(actor, action, resource)`. Requesters are blocked from approving their own items. Requests for unauthorized teams return HTTP 404 (not 403).
+- **Files:** [`domain/policy.py`](file:///d:/projects/Newtonite/backend/app/domain/policy.py) · [`domain/workflow.py`](file:///d:/projects/Newtonite/backend/app/domain/workflow.py) · [`approval_service.py`](file:///d:/projects/Newtonite/backend/app/services/approval_service.py)
 
----
-
-## 3. Transactional outbox in MongoDB for asynchronous work, not a message broker
-
-**Context.** Notifications and embedding/indexing should not slow the user's request, and must survive crashes, retries and delays.
-
-**Decision.** The business write, the audit event and the outbox messages commit in **one transaction**. A worker polls the `outbox` collection and takes jobs with an atomic `findOneAndUpdate` that sets a **lease**. Failures retry with exponential backoff and jitter, then become `dead` (visible and retryable by admins). Handlers are **idempotent** (unique `dedupe_key` for notifications, deterministic chunk ids and `text_hash` for embeddings), and read *current* state rather than trusting event payloads, so ordering problems are harmless.
-
-**Alternatives rejected.** Redis or BullMQ/Celery (one more system to run, secure and keep consistent with Mongo, and there is still a dual-write problem without an outbox). Fire-and-forget background tasks in the API process (lost on crash).
-
-**Trade-off.** Polling adds up to ~1 s of latency and puts a little read load on Mongo. It is acceptable for notifications and embeddings. It would be the first thing to replace with a broker at much larger scale. The worker is already a separate process, so this swap does not touch the API.
-
----
-
-## 4. Authorization as one pure policy function, enforced per resource, with 404 for invisible resources
-
-**Context.** Authorization must hold server-side, per resource and per team. Users have different roles in different teams.
-
-**Decision.**
-- Team-scoped roles (`viewer < member < lead`) in `memberships`, plus an org-admin flag for administration only.
-- All checks go through `policy.can(actor, action, resource)`, a **pure function** with no I/O. The service loads memberships, calls the policy, then writes. This makes the whole permission model testable as a matrix.
-- Rules include relationship-aware cases (assignee, reporter) and a **four-eyes rule**: you cannot approve something you requested.
-- Resources outside the caller's teams return **404**, not 403, to avoid leaking existence.
-- The same enforcement covers search, similar-items, **RAG retrieval** (pre-filter on `team_id` plus a post-retrieval re-check) and SSE fan-out.
-- The API also returns a computed `permissions` object so the UI can render controls, which is advisory only.
-
-**Alternatives rejected.** Decorator-only role checks (too coarse for ownership rules). A full ABAC or policy engine such as OPA or Casbin (too heavy for one day, and harder to explain in a review).
-
-**Trade-off.** A custom policy means we own its correctness, so it is the most heavily tested module. Org admins can read all items but cannot act on them without team membership, which adds a step but keeps the audit trail attributable.
+#### 5. Grounded AI & Multi-Tenant Retrieval (Groq Cloud)
+- **Why:** Fast history Q&A and duplicate prevention with zero cross-tenant data leakage.
+- **Rules:** Hard query-time pre-filter on `team_id` in `$vectorSearch`. Post-retrieval read policy re-check. Sever-side citation verification strips hallucinated markers. Circuit breaker falls back to raw passages if LLM is offline.
+- **Files:** [`ai_service.py`](file:///d:/projects/Newtonite/backend/app/services/ai_service.py) · [`providers.py`](file:///d:/projects/Newtonite/backend/app/infra/ai/providers.py) · [`repositories/chunks.py`](file:///d:/projects/Newtonite/backend/app/repositories/chunks.py)
 
 ---
 
-## 5. A small, hand-built, authorization-aware RAG layer that is optional by design
-
-**Context.** The role is RAG-focused, but the assignment is about backend correctness. AI should add value without risking the core.
-
-**Decision.** Two features: **similar-item / duplicate hints** and **"Ask the history"** (grounded Q&A with citations). Specifics:
-- One chunk per semantic unit (item, comment, decision), with a header prefix and splitting only for long text. This beats fixed-size windows for short, structured records.
-- Embeddings run **asynchronously** from the outbox; the model is local (`bge-small-en-v1.5` via fastembed) so there is no API key dependency; the provider is an interface.
-- Retrieval uses Atlas Vector Search with a **`team_id` pre-filter**, so unauthorized text never reaches a prompt.
-- The LLM has no tools. Sources are delimited and treated as **untrusted**. Citations are **validated server-side**. If the LLM is down or unconfigured, the API returns the retrieved passages without an answer (`degraded: true`).
-- A **golden-set evaluation script** reports Recall@k, MRR, latency and citation validity.
-- The pipeline is hand-rolled (≈200 lines) with clean `EmbeddingProvider` and `LLMProvider` interfaces rather than tied to LangChain or LlamaIndex.
-
-**Alternatives rejected.** Heavy reliance on LangChain or LlamaIndex for this assessment. While these frameworks are industry standards for broad ingestion ecosystems, in this assessment they obscure critical correctness mechanics: tenant/team vector pre-filtering, server-side citation validation, and offline degradation. Our clean provider abstractions (`EmbeddingProvider`, `LLMProvider`) make every retrieval step explicit and testable, while allowing LangChain/LlamaIndex retrievers to be plugged in seamlessly when expanding to multi-source enterprise document ingestion. Fully LLM-driven agent features were also rejected (too unpredictable for core operational ticketing).
-
-**Trade-off.** Hand-rolling means implementing our own chunking, vector filtering, and citation validation routines. For this scope, that is a deliberate strength: every step is visible, testable, and auditable during review. A local embedding model (`bge-small-en-v1.5`) is slightly less expressive than large hosted models, but guarantees zero-cost, local-only testability without external API key dependencies.
-
----
-
-## Also decided (shorter notes)
-
-- **Comments are events**, not a separate collection. One ordered timeline, one pagination path, append-only by construction. Cost: comment editing is out of scope.
-- **Keyset pagination** and **no total counts**. Stable and fast at depth, at the cost of "jump to page N". Overview counts are capped.
-- **SSE as invalidation hints**, not data push. One source of truth (REST) and one authorization path, at the cost of a refetch per change.
-- **`attention_due_at` stored on the item** so "forgotten work" is an indexed range query with no cron job.
-- **Same-origin deployment** (reverse proxy), so first-party cookies, no CORS surface, and straightforward CSRF defence.
-
-## Intentionally not built
-
-SSO/OAuth · file attachments · real email delivery (stubbed) · configurable workflows per team · cross-team transfer · comment editing/deletion · full RBAC admin UI · i18n · mobile app. See `KNOWN_LIMITATIONS.md`.
+### Related Documentation Links
+- Full Architecture & Sequence Diagrams: [`docs/SYSTEM_DESIGN.md`](file:///d:/projects/Newtonite/docs/SYSTEM_DESIGN.md)
+- HTTP REST Contracts & Error Codes: [`docs/API_SPEC.md`](file:///d:/projects/Newtonite/docs/API_SPEC.md)
+- Interview Demo Script & Top 20 Q&As: [`docs/INTERVIEW_GUIDE.md`](file:///d:/projects/Newtonite/docs/INTERVIEW_GUIDE.md)
