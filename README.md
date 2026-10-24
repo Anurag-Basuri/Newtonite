@@ -411,3 +411,4 @@ Evaluated against [`backend/eval/golden_set.json`](backend/eval/golden_set.json)
 | [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md) | Risk-driven testing strategy, test IDs (`T-CLM-1`, `T-VER-1`), and verification matrix. |
 | [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | Phased delivery schedule, day-0 risk checklist, and build sequences. |
 | [`docs/REVIEW_PREP.md`](docs/REVIEW_PREP.md) | Comprehensive walkthrough script, failure scenarios, and candidate interview defense sheet. |
+| [`docs/INTERVIEW_GUIDE.md`](docs/INTERVIEW_GUIDE.md) | **Master Interview Study Guide:** Exhaustive file map, architecture flows, 10-minute demo script, and 20 top Q&As. |
